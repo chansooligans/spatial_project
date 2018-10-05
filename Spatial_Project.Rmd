@@ -1,0 +1,127 @@
+---
+title: "Spatial Project"
+author: "Chansoo Song"
+date: "10/2/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE,warning=FALSE,message=FALSE}
+knitr::opts_chunk$set(echo=TRUE,tidy=TRUE)
+    library(ggplot2)
+    library(gstat)
+    library(lattice)
+    library(maps)
+    library(spdep)
+    library(spatstat)
+    library(maptools)
+    library(RColorBrewer)
+    library(classInt)
+    library(rgdal)
+    library(formatR)
+    library(sm)
+    library(smacpod)
+    library(SpatialEpi)
+    library(GISTools)
+    library(dplyr)
+```
+
+```{r}
+load('Data/stops2013clean.RData')
+
+cols_to_keep = c("id",
+                 "lon",
+                 "lat",
+                 "year",
+                 "precinct",
+                 "found.contraband",
+                 "found.pistol",
+                 "found.rifle",
+                 "found.assault",
+                 "found.knife",
+                 "found.machinegun",
+                 "found.other",
+                 "found.gun",
+                 "found.weapon")
+
+# Subset data
+df = stops2013clean[,cols_to_keep]
+rm(stops2013clean)
+```
+
+
+```{r}
+cols_hit = c("found.contraband",
+                 "found.pistol",
+                 "found.rifle",
+                 "found.assault",
+                 "found.knife",
+                 "found.machinegun",
+                 "found.other",
+                 "found.gun",
+                 "found.weapon")
+
+# hits column
+df$hit = ifelse( apply(df[,cols_hit],1,sum)>0, 1, 0)
+```
+
+```{r}
+make_circles <- function(centers, radius, nPoints = 100){
+    # centers: the data frame of centers with ID
+    # radius: radius measured in kilometer
+    #
+    # meanLat <- mean(centers$lat)
+    # length per longitude changes with lattitude, so need correction
+    # radiusLon <- radius /111 / cos(meanLat/57.3) 
+    # radiusLat <- radius / 111
+    circleDF <- data.frame(ID = rep(centers$X, each = nPoints))
+    angle <- seq(0,2*pi,length.out = nPoints)
+
+    circleDF$lon <- unlist(lapply(centers$lon, function(x) x + radius * cos(angle)))
+    circleDF$lat <- unlist(lapply(centers$lat, function(x) x + radius * sin(angle)))
+    return(circleDF)
+}
+
+data = read.csv('/Users/Chansoo/Desktop/Spatial_Project/results/Manhattan_0.01_result.csv',header = T)
+
+
+# here is the data frame for all circles
+myCircles <- make_circles(data, 0.01)
+```
+
+
+```{r}
+# devtools::install_github("dkahle/ggmap", ref = "tidyup")
+library(ggmap)
+
+register_google(key = "AIzaSyC4ABT6F3JznHUr-uCTAFs4R3lgDYNul_k")
+nyc_map = get_map(location = c(lon = -73.94316, lat = 40.7965), 
+                  zoom = 14, 
+                  maptype = "satellite",
+                  source = "google")
+nycMap = ggmap(nyc_map, extent = "panel", legend = "bottomright")
+nycMap
+
+RL = geom_point(aes(x = lon, y = lat), 
+                data = data, 
+                color = "#ff0000")
+stops = geom_point(aes(x=lon, y = lat), 
+                   data = df, 
+                   color = df$hit+1,
+                   alpha = 0.2)
+
+nycMap + RL + stops +
+    geom_polygon(data = myCircles, aes(lon, lat, group = ID), color = "red", alpha = 0)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
