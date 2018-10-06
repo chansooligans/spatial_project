@@ -3,6 +3,8 @@ require(dplyr)
 
 radius = 0.005
 
+#test
+
 # Load Data
 # setwd('/Users/Chansoo/Desktop/Spatial_Project/')
 load('Data/stops2013clean.RData')
