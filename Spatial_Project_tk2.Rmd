@@ -1,0 +1,95 @@
+---
+title: "Hit Rates"
+author: "Tina Koo"
+date: "10/5/2018"
+output: pdf_document
+---
+```{r setup, include=FALSE,warning=FALSE,message=FALSE}
+knitr::opts_chunk$set(echo=TRUE,tidy=TRUE)
+    library(ggplot2)
+    library(gstat)
+    library(lattice)
+    library(maps)
+    library(spdep)
+    library(spatstat)
+    library(maptools)
+    library(RColorBrewer)
+    library(classInt)
+    library(rgdal)
+    library(formatR)
+    library(sm)
+    library(smacpod)
+    library(SpatialEpi)
+    library(GISTools)
+    library(dplyr)
+    library(sp)
+```
+
+```{r}
+load('/Users/tinakoo/Desktop/Spatial Analysis/Data/Stop_Frisk/stops2013clean.RData')
+prec_bor = read.csv('Data/prec_to_boroughs.csv', header = F, stringsAsFactors = F)
+colnames(prec_bor) = c('precinct','borough')
+# Subset data
+cols_to_keep = c("id",
+                 "lon",
+                 "lat",
+                 "year",
+                 "precinct",
+                 "found.contraband",
+                 "found.pistol",
+                 "found.rifle",
+                 "found.assault",
+                 "found.knife",
+                 "found.machinegun",
+                 "found.other",
+                 "found.gun",
+                 "found.weapon")
+df = stops2013clean[,cols_to_keep]
+df$precinct = as.integer(as.character(df$precinct))
+df = df %>% 
+  left_join(prec_bor, by = 'precinct')
+rm(stops2013clean)
+rm(prec_bor)
+```
+
+```{r}
+cols_hit = c("found.contraband",
+                 "found.pistol",
+                 "found.rifle",
+                 "found.assault",
+                 "found.knife",
+                 "found.machinegun",
+                 "found.other",
+                 "found.gun",
+                 "found.weapon")
+
+# hits column
+df$hit = ifelse( apply(df[,cols_hit],1,sum)>0, 1, 0)
+```
+
+```{r}
+# manhattan results
+data = read.csv('/Users/tinakoo/Desktop/Spatial Analysis/Stop and Frisk/results/Manhattan_0.01_result.csv',header = T)
+
+# manhattan subset
+df.flt = filter(df, borough=="Manhattan")
+
+# random sample of centroids
+df.sp <- sample_n(mttn, 1000)
+df.rate <- matrix(nrow=1000, ncol=1) # empty matrix
+
+for (i in 1:1000){
+  coord<-df.sp[,c("id", "lon","lat", "hit")]
+  
+  # get centroid
+  centroid_x = coord[i, 2]
+  centroid_y = coord[i, 3]
+  
+  # compute distance
+  coord$dist = sqrt((coord$lon - rep(centroid_x, nrow(coord))) ^ 2 + (coord$lat - rep(centroid_y, nrow(coord))) ^ 2)
+  
+  # 1 if less than radius
+  coord$in_circle<-ifelse(coord$dist<0.01, 1, 0)
+  df.rate[i] <- sum(coord$in_circle==1 & coord$hit==1)/sum(coord$in_circle==1)
+}
+```
