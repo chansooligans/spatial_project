@@ -72,6 +72,22 @@ rm(stops2013clean)
 rm(prec_bor)
 ```
 
+## Hit Rate within Circle
+
+```{r}
+center = high_stops_center[1,c('lon','lat')]
+
+# Radius
+radius = 0.01
+
+# Distances between Center and All Stops
+distances = sqrt((df$lon - center$lon)^ 2 + (df$lat - center$lat)^ 2)
+  
+# Hit Rate of Stops within Radius
+in_circle = ifelse(distances < radius, 1, 0)
+center_hit_rate = sum(in_circle * df$hit) / sum(in_circle)
+```
+
 ## Test for Significance of Hit Rate in the High Stop Circle
 
 ```{r}
@@ -81,7 +97,6 @@ samples_idx = sample(nrow(df), n_samples)
 centers = df[samples_idx,c("id","lon","lat","hit")]
 
 # Get Hit Rates for Circles of Fixed Radius around this random sample of centers
-radius = 0.01
 hit_rate = rep(NA, n_samples)
 for(i in 1:n_samples){
   # Longitude and Latitude of Center
@@ -97,7 +112,8 @@ for(i in 1:n_samples){
   hit_rate[i] = sum(in_circle * df$hit) / sum(in_circle)
 }
 
-plot(density(hit_rate))
+plot(density(hit_rate), main = 'Sampling Distribution of Hit Rates')
+abline(v = center_hit_rate, col = 3)
 ```
 
 ## Draw Circles
