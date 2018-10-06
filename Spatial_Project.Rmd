@@ -7,27 +7,32 @@ output: pdf_document
 
 ```{r setup, include=FALSE,warning=FALSE,message=FALSE}
 knitr::opts_chunk$set(echo=TRUE,tidy=TRUE)
-    library(ggplot2)
-    library(gstat)
-    library(lattice)
-    library(maps)
-    library(spdep)
-    library(spatstat)
-    library(maptools)
-    library(RColorBrewer)
-    library(classInt)
-    library(rgdal)
-    library(formatR)
-    library(sm)
-    library(smacpod)
-    library(SpatialEpi)
-    library(GISTools)
-    library(dplyr)
+  library(ggplot2)
+  library(dplyr)
+  # devtools::install_github("dkahle/ggmap", ref = "tidyup")
+  library(ggmap) # install using line above
 ```
 
+## Load Data
+
 ```{r}
+# Stop and Frisk Data
 load('Data/stops2013clean.RData')
 
+# CSV containing precincts and corresponding borough
+prec_bor = read.csv('Data/prec_to_boroughs.csv', header = F, stringsAsFactors = F)
+
+# Latitude and Longitude of the center of the circle containing highest number of stops
+high_stops_center = read.csv('results/Manhattan_0.01_result.csv',header = T)
+```
+
+## Clean Data
+
+```{r}
+# Column names of prec_bor
+colnames(prec_bor) = c('precinct','borough')
+
+# Subset stop and frisk data
 cols_to_keep = c("id",
                  "lon",
                  "lat",
@@ -42,14 +47,9 @@ cols_to_keep = c("id",
                  "found.other",
                  "found.gun",
                  "found.weapon")
-
-# Subset data
 df = stops2013clean[,cols_to_keep]
-rm(stops2013clean)
-```
 
-
-```{r}
+# Create "Hits" column in Stop and Frisk Data
 cols_hit = c("found.contraband",
                  "found.pistol",
                  "found.rifle",
@@ -59,10 +59,48 @@ cols_hit = c("found.contraband",
                  "found.other",
                  "found.gun",
                  "found.weapon")
-
 # hits column
 df$hit = ifelse( apply(df[,cols_hit],1,sum)>0, 1, 0)
+
+# Merge Stop and Frisk Data and Precinct_Borough Data
+df$precinct = as.integer(as.character(df$precinct))
+df = df %>% 
+  left_join(prec_bor, by = 'precinct')
+
+# Don't need these anymore. 
+rm(stops2013clean)
+rm(prec_bor)
 ```
+
+## Test for Significance of Hit Rate in the High Stop Circle
+
+```{r}
+# Random sample of centers
+n_samples = 999
+samples_idx = sample(nrow(df), n_samples)
+centers = df[samples_idx,c("id","lon","lat","hit")]
+
+# Get Hit Rates for Circles of Fixed Radius around this random sample of centers
+radius = 0.01
+hit_rate = rep(NA, n_samples)
+for(i in 1:n_samples){
+  # Longitude and Latitude of Center
+  center_lon = centers[i,c("lon")]
+  center_lat = centers[i,c("lat")]
+  
+  # Distances between Center and All Stops
+  distances = sqrt((df$lon - center_lon)^ 2 + (df$lat - center_lat)^ 2)
+  
+  # Hit Rate of Stops within Radius
+  in_circle = ifelse(distances < radius, 1, 0)
+  
+  hit_rate[i] = sum(in_circle * df$hit) / sum(in_circle)
+}
+
+plot(density(hit_rate))
+```
+
+## Draw Circles
 
 ```{r}
 make_circles <- function(centers, radius, nPoints = 100){
@@ -81,18 +119,14 @@ make_circles <- function(centers, radius, nPoints = 100){
     return(circleDF)
 }
 
-data = read.csv('/Users/Chansoo/Desktop/Spatial_Project/results/Manhattan_0.01_result.csv',header = T)
-
 
 # here is the data frame for all circles
 myCircles <- make_circles(data, 0.01)
 ```
 
+## Plot on Map
 
 ```{r}
-# devtools::install_github("dkahle/ggmap", ref = "tidyup")
-library(ggmap)
-
 register_google(key = "AIzaSyC4ABT6F3JznHUr-uCTAFs4R3lgDYNul_k")
 nyc_map = get_map(location = c(lon = -73.94316, lat = 40.7965), 
                   zoom = 14, 

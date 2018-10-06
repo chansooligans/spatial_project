@@ -75,7 +75,7 @@ data = read.csv('/Users/tinakoo/Desktop/Spatial Analysis/Stop and Frisk/results/
 df.flt = filter(df, borough=="Manhattan")
 
 # random sample of centroids
-df.sp <- sample_n(mttn, 1000)
+df.sp <- sample_n(df.flt, 1000)
 df.rate <- matrix(nrow=1000, ncol=1) # empty matrix
 
 for (i in 1:1000){
