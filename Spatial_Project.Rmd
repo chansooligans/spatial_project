@@ -21,9 +21,6 @@ load('Data/stops2013clean.RData')
 
 # CSV containing precincts and corresponding borough
 prec_bor = read.csv('Data/prec_to_boroughs.csv', header = F, stringsAsFactors = F)
-
-# Latitude and Longitude of the center of the circle containing highest number of stops
-high_stops_center = read.csv('results/Manhattan_0.01_result.csv',header = T)
 ```
 
 ## Clean Data
@@ -72,95 +69,192 @@ rm(stops2013clean)
 rm(prec_bor)
 ```
 
-## Hit Rate within Circle
+## Set Radius then Pick center with largest number of stops within radius
+
+The "parallel_dist_spacial.R" and "parallel_dist_spatial_bk.R" were run on NYU's HPC Clusters to identify the centers of circles containing the most stops. We tried different radii: 0.01, 0.0075, and 0.005.
+
+These centers were identified for each borough then saved with corresponding coordinates into the "results" folder. Here, I compared the top candidate centers from each borough to identify a single center with the most stops within the radius.
 
 ```{r}
-center = high_stops_center[1,c('lon','lat')]
-
 # Radius
 radius = 0.01
 
-# Distances between Center and All Stops
-distances = sqrt((df$lon - center$lon)^ 2 + (df$lat - center$lat)^ 2)
+boroughs = c("Bronx", "Brooklyn", "Manhattan", "Queens", "Staten Island")
+result_files = paste('results/',boroughs,'_',radius,'_result.csv',sep='')
+
+candidate_centers = as.data.frame(matrix(0,nrow=5,ncol=4))
+colnames(candidate_centers) = c('X','lon','lat','n')
+
+for (i in 1:length(result_files)) {
+  result_file = read.csv(result_files[i], header=T)
+  candidate = result_file[1,c('X','lon','lat')]
+  # Distances between Center and All Stops
+  dists = sqrt((df$lon - candidate$lon)^ 2 + (df$lat - candidate$lat)^ 2)
+  # Count Stops in Circle
+  n = sum(ifelse(dists < radius, 1, 0))
   
-# Hit Rate of Stops within Radius
-in_circle = ifelse(distances < radius, 1, 0)
-center_hit_rate = sum(in_circle * df$hit) / sum(in_circle)
+  candidate_centers[i,] = c(candidate, n)
+}
+
+
 ```
 
-## Test for Significance of Hit Rate in the High Stop Circle
+
+## Hit Rate within Circle
+
+```{r}
+center = candidate_centers %>%
+  arrange(-n) %>%
+  dplyr::select(X,lon,lat) %>%
+  head(1)
+            
+# Distances between Center and All Stops
+dists = sqrt((df$lon - center$lon)^ 2 + (df$lat - center$lat)^ 2)
+  
+# Hit Rate of Stops within Radius
+in_circle = ifelse(dists < radius, 1, 0)
+center_hit_rate = sum(in_circle * df$hit) / sum(in_circle)
+
+# Store number of stops in this circle for later
+n_in_circle = sum(in_circle)
+```
+
+## Test for Significance of Hit Rate in the High Stop Circle using Fixed Radius
 
 ```{r}
 # Random sample of centers
-n_samples = 999
+n_samples = 1000
 samples_idx = sample(nrow(df), n_samples)
 centers = df[samples_idx,c("id","lon","lat","hit")]
 
 # Get Hit Rates for Circles of Fixed Radius around this random sample of centers
-hit_rate = rep(NA, n_samples)
+hit_rates_radius = rep(NA, n_samples)
 for(i in 1:n_samples){
   # Longitude and Latitude of Center
   center_lon = centers[i,c("lon")]
   center_lat = centers[i,c("lat")]
   
   # Distances between Center and All Stops
-  distances = sqrt((df$lon - center_lon)^ 2 + (df$lat - center_lat)^ 2)
+  dists = sqrt((df$lon - center_lon)^ 2 + (df$lat - center_lat)^ 2)
   
   # Hit Rate of Stops within Radius
-  in_circle = ifelse(distances < radius, 1, 0)
+  in_circle = ifelse(dists < radius, 1, 0)
   
-  hit_rate[i] = sum(in_circle * df$hit) / sum(in_circle)
+  hit_rates_radius[i] = sum(in_circle * df$hit) / sum(in_circle)
 }
 
-plot(density(hit_rate), main = 'Sampling Distribution of Hit Rates')
+plot(density(hit_rates_radius), main = 'Sampling Distribution of Hit Rates')
 abline(v = center_hit_rate, col = 3)
 ```
+
+## Test for Significance of Hit Rate in the High Stop Circle using Random Circles containing same number of Stops
+
+```{r}
+# Random sample of centers
+n_samples = 1000
+samples_idx = sample(nrow(df), n_samples)
+centers = df[samples_idx,c("id","lon","lat","hit")]
+
+# Get Hit Rates for Circles of Fixed Radius around this random sample of centers
+hit_rates_n = rep(NA, n_samples)
+for(i in 1:n_samples){
+  # Longitude and Latitude of Center
+  center_lon = centers[i,c("lon")]
+  center_lat = centers[i,c("lat")]
+  
+  # Distances between Center and All Stops
+  dists = sqrt((df$lon - center_lon)^ 2 + (df$lat - center_lat)^ 2)
+  
+  # Hit Rate of N number of nearest Stops to Center
+  n_short_dists = sort(dists, decreasing = F)[1:n_in_circle]
+  idx_short_dists = which(dists %in% n_short_dists)
+  
+  hit_rates_n[i] = sum(df$hit[idx_short_dists]) / n_in_circle
+}
+
+plot(density(hit_rates_n), main = 'Sampling Distribution of Hit Rates')
+abline(v = center_hit_rate, col = 3)
+```
+
+
+## Test for Significance of Spillover Effect on Stops near main circle but just outside
+
+```{r}
+# Random sample of centers
+n_in_circle
+
+# Distances between Center and All Stops
+dists = sqrt((df$lon - center$lon)^ 2 + (df$lat - center$lat)^ 2)
+  
+# Hit Rate of Stops within Radius
+extension.tries = matrix(ncol=2,nrow=20)
+
+x = seq(0.01,0.0125,length=20)
+for(i in 1:20){
+  in_circle = ifelse(dists > radius & dists < radius + x[i], 1, 0)
+  extension.tries[i,] = c(x[i],sum(in_circle)-n_in_circle)
+}
+extension.tries
+
+# Extend radius by 0.01210526
+in_circle = ifelse(dists > radius & dists < radius + 0.01210526, 1, 0)
+spillover_hit_rate = sum(in_circle * df$hit) / sum(in_circle)
+
+plot(density(hit_rates_radius), main = 'Sampling Distribution of Hit Rates')
+abline(v = center_hit_rate, col = 3)
+abline(v = spillover_hit_rate, col = 2)
+```
+
+
+
+
+
+
+
+
+###########################################################################
+##### IGNORE BELOW FOR NOW
+###########################################################################
 
 ## Draw Circles
 
 ```{r}
 make_circles <- function(centers, radius, nPoints = 100){
-    # centers: the data frame of centers with ID
-    # radius: radius measured in kilometer
-    #
-    # meanLat <- mean(centers$lat)
-    # length per longitude changes with lattitude, so need correction
-    # radiusLon <- radius /111 / cos(meanLat/57.3) 
-    # radiusLat <- radius / 111
     circleDF <- data.frame(ID = rep(centers$X, each = nPoints))
     angle <- seq(0,2*pi,length.out = nPoints)
-
-    circleDF$lon <- unlist(lapply(centers$lon, function(x) x + radius * cos(angle)))
-    circleDF$lat <- unlist(lapply(centers$lat, function(x) x + radius * sin(angle)))
+    circleDF$lon = unlist(lapply(centers$lon, function(x) x + radius * cos(angle)))
+    circleDF$lat = unlist(lapply(centers$lat, function(x) x + radius * sin(angle)))
     return(circleDF)
 }
 
 
 # here is the data frame for all circles
-myCircles <- make_circles(data, 0.01)
+myCircles <- make_circles(center, 0.01)
 ```
 
 ## Plot on Map
 
 ```{r}
+# colnames(centers) = c('X','lon','lat','hit')
+myCircles <- make_circles(centers[1:30,], 0.01)
+
 register_google(key = "AIzaSyC4ABT6F3JznHUr-uCTAFs4R3lgDYNul_k")
-nyc_map = get_map(location = c(lon = -73.94316, lat = 40.7965), 
-                  zoom = 14, 
+nyc_map = get_map(location = c(lon = -73.94316, lat = 40.6965), 
+                  zoom = 11, 
                   maptype = "satellite",
                   source = "google")
 nycMap = ggmap(nyc_map, extent = "panel", legend = "bottomright")
 nycMap
 
-RL = geom_point(aes(x = lon, y = lat), 
-                data = data, 
-                color = "#ff0000")
+#  5% Sample
+df.sampled = df[sample(nrow(df),nrow(df)*.05),]
 stops = geom_point(aes(x=lon, y = lat), 
-                   data = df, 
-                   color = df$hit+1,
+                   data = df.sampled, 
+                   color = df.sampled$hit+1,
                    alpha = 0.2)
 
-nycMap + RL + stops +
-    geom_polygon(data = myCircles, aes(lon, lat, group = ID), color = "red", alpha = 0)
+nycMap + stops +
+    geom_polygon(data = myCircles, aes(lon, lat), color = "red", alpha = 0) 
 
 ```
 
