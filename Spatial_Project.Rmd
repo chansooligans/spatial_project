@@ -18,6 +18,7 @@ knitr::opts_chunk$set(echo=TRUE,tidy=TRUE)
 ```{r}
 # Stop and Frisk Data
 load('Data/stops2013clean.RData')
+stops2013clean = as.data.frame(stops2013clean)
 
 # CSV containing precincts and corresponding borough
 prec_bor = read.csv('Data/prec_to_boroughs.csv', header = F, stringsAsFactors = F)
@@ -155,7 +156,7 @@ n_samples = 1000
 samples_idx = sample(nrow(df), n_samples)
 centers = df[samples_idx,c("id","lon","lat","hit")]
 
-# Get Hit Rates for Circles of Fixed Radius around this random sample of centers
+# Get Hit Rates for Circles of Same Number of Stops around this random sample of centers
 hit_rates_n = rep(NA, n_samples)
 for(i in 1:n_samples){
   # Longitude and Latitude of Center
@@ -235,7 +236,8 @@ myCircles <- make_circles(center, 0.01)
 ## Plot on Map
 
 ```{r}
-# colnames(centers) = c('X','lon','lat','hit')
+colnames(centers) = c('X','lon','lat','hit')
+myCircle <- make_circles(center, 0.01)
 myCircles <- make_circles(centers[1:30,], 0.01)
 
 register_google(key = "AIzaSyC4ABT6F3JznHUr-uCTAFs4R3lgDYNul_k")
@@ -253,8 +255,13 @@ stops = geom_point(aes(x=lon, y = lat),
                    color = df.sampled$hit+1,
                    alpha = 0.2)
 
+circle.IDs = unique(myCircles$ID)
+
+
+# Show Map
 nycMap + stops +
-    geom_polygon(data = myCircles, aes(lon, lat), color = "red", alpha = 0) 
+    geom_polygon(data = myCircle, aes(lon, lat), color = "red", alpha = 0) +
+    geom_polygon(data = myCircles[myCircles$ID %in% circle.IDs[1:3],], aes(lon, lat, group=ID), color = "blue", alpha = 0) 
 
 ```
 
