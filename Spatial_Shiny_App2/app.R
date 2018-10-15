@@ -113,7 +113,7 @@ server <- function(input, output) {
   # Hit Rate of Stops within Radius
   in_circle = ifelse(dists < radius, 1, 0)
   center_hit_rate = sum(in_circle * df$hit) / sum(in_circle)
-  
+  n_in_circle = sum(in_circle)
   
   ##### Random Areas #####
   
@@ -193,7 +193,7 @@ server <- function(input, output) {
   
   output$newPlot <- renderPlot({
     
-    plot(density(hit_rates_radius[1:sample.no()]), main = 'Sampling Distribution of Hit Rates', col='blue')
+    plot(density(hit_rates_n[1:sample.no()]), main = 'Sampling Distribution of Hit Rates', col='blue')
     abline(v = center_hit_rate, col = 2)
     
   })
