@@ -7,9 +7,10 @@ setwd('/Users/Chansoo/Desktop/Spatial_Project/')
 ui <- fluidPage(
   
   # Application title
-  titlePanel("Stop and Frisk"),
+  titlePanel("Stop and Frisk: # of Stops"),
   
   actionButton("go", "Go"),
+  numericInput("multiplier", "Skip (# of Go's at Once. Max = 10):", 1, min = 1, max = 10),
     
     # Show a plot of the generated distribution
     mainPanel(
@@ -26,7 +27,7 @@ server <- function(input, output) {
   
   sample.no <- reactiveVal(2)
   observeEvent(input$go, {
-    newSampleNo = sample.no() +1
+    newSampleNo = sample.no() + 1 * input$multiplier
     sample.no(newSampleNo)
   })
   
@@ -180,6 +181,12 @@ server <- function(input, output) {
                      alpha = 0.2)
   
   
+  ########################################
+  
+  # Load Hit Rate Distribution Computed by Drawing Samples over All of NYC
+  # Without any radius or population restrictions
+  load('Data/hit_rate_dist_over_all_NYC.RData')
+  
   
   ########################################
   
@@ -201,8 +208,12 @@ server <- function(input, output) {
   
   output$newPlot <- renderPlot({
     
-    plot(density(hit_rates_n[1:sample.no()]), main = 'Sampling Distribution of Hit Rates', col='blue')
-    abline(v = center_hit_rate, col = 2)
+    plot(density(hit_rates_n[1:sample.no()]), main = 'Sampling Distribution of Hit Rates', col='blue', ylim=c(0,240))
+    abline(v = mean(hit_rates_n[1:sample.no()]), col = 'blue', lty = 2)
+    lines(density(hit_rates), col = 'green')
+    abline(v = mean(hit_rates), col = 'green', lty=2)
+    abline(v = center_hit_rate, col = 'red', lty=2)
+    
     
   })
 }

@@ -11,7 +11,7 @@ setwd('/Users/Chansoo/Desktop/Spatial_Project/')
 ui <- fluidPage(
    
    # Application title
-   titlePanel("Stop and Frisk"),
+   titlePanel("Stop and Frisk: Radius"),
    
    # Sidebar with a slider input for number of bins 
    sidebarLayout(
@@ -20,6 +20,7 @@ ui <- fluidPage(
                      "Number of Circles:",
                      min = 1,
                      max = 1000,
+                     width = '200%',
                      value = 2)
       ),
       
@@ -187,6 +188,13 @@ server <- function(input, output) {
     circle.IDs = unique(myCircles$ID)
     
     
+    
+    ########################################
+    
+    # Load Hit Rate Distribution Computed by Drawing Samples over All of NYC
+    # Without any radius or population restrictions
+    load('Data/hit_rate_dist_over_all_NYC.RData')
+    
     ########################################
     
     output$distPlot <- renderPlot({
@@ -202,8 +210,11 @@ server <- function(input, output) {
     
     output$newPlot <- renderPlot({
      
-      plot(density(hit_rates_radius[1:input$circles]), main = 'Sampling Distribution of Hit Rates', col='blue')
-      abline(v = center_hit_rate, col = 2)
+      plot(density(hit_rates_radius[1:input$circles]), main = 'Sampling Distribution of Hit Rates', col='blue', ylim=c(0,240))
+      abline(v = mean(hit_rates_radius[1:input$circles]), col = 'blue', lty=2)
+      lines(density(hit_rates), col = 'green')
+      abline(v = mean(hit_rates), col = 'green', lty=2)
+      abline(v = center_hit_rate, col = 'red', lty=2)
    
     })
 }
