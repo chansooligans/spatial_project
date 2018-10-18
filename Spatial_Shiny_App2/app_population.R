@@ -1,5 +1,6 @@
 library(shiny)
 library(dplyr)
+library(ggmap)
 
 setwd('/Users/Chansoo/Desktop/Spatial_Project/')
 
@@ -10,7 +11,7 @@ ui <- fluidPage(
   titlePanel("Stop and Frisk: # of Stops"),
   
   actionButton("go", "Go"),
-  numericInput("multiplier", "Skip (# of Go's at Once. Max = 10):", 1, min = 1, max = 10),
+  numericInput("multiplier", "Skip (# of Go's at Once. Max = 10):", 1, min = 1, max = 100),
     
     # Show a plot of the generated distribution
     mainPanel(

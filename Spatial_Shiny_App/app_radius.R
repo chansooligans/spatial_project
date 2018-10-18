@@ -1,5 +1,6 @@
 library(shiny)
 library(dplyr)
+library(ggmap)
 
 setwd('/Users/Chansoo/Desktop/Spatial_Project/')
 
