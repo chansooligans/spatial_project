@@ -24,7 +24,7 @@ stops2013clean = as.data.frame(stops2013clean)
 prec_bor = read.csv('Data/prec_to_boroughs.csv', header = F, stringsAsFactors = F)
 ```
 
-## Clean Data
+## Subset Data
 
 ```{r}
 # Column names of prec_bor
@@ -210,11 +210,8 @@ abline(v = spillover_hit_rate, col = 2)
 
 
 
-
-
-
 ###########################################################################
-##### IGNORE BELOW FOR NOW
+##### IGNORE BELOW. RE-CREATED AS SHINY APPS
 ###########################################################################
 
 ## Draw Circles
